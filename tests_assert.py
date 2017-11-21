@@ -3,6 +3,9 @@ from pprint import pprint
 def add(x, y):
     return x + y
 
+def square(a):
+    return a ** 2
+
 
 def test_add():
     # ok
@@ -10,6 +13,10 @@ def test_add():
     # nok
     a, b, result = 4, 6, 14
     assert add(a, b) == result
+
+
+def test_square():
+    assert square(10) == 100
 
 
 #if __name__ == '__main__':
