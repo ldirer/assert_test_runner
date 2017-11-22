@@ -33,9 +33,16 @@ def test_add_and_square():
 
 def test_nested_function():
 
+    # This one is a bit different, the traceback on assertion error will have an additional frame.
     def test_this():
         a, b = 2, 2
         expected = 16
         assert square(add(a, b)) == expected - 1
 
     test_this()
+
+
+def test_set_comparison():
+    a = {1, 2, 3, 4}
+    b = {1, 2, 5}
+    assert a == b
