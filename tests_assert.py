@@ -1,7 +1,7 @@
 
-from pprint import pprint
 def add(x, y):
     return x + y
+
 
 def square(a):
     return a ** 2
@@ -19,8 +19,7 @@ def test_square():
     assert square(10) == 100
 
 
-#if __name__ == '__main__':
-#    print('__name__', __name__)
-#    print('{:-^40}'.format('locals'))
-#    pprint(locals())
-#    test_add()
+def test_add_and_square():
+    a, b = 2, 3
+    expected = 25
+    assert square(add(a, b)) == expected - 1
