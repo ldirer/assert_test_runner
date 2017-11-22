@@ -1,3 +1,8 @@
+"""
+This file contains mostly failing tests in slightly different shapes and forms so we can test our
+test runner.
+"""
+
 
 def add(x, y):
     return x + y

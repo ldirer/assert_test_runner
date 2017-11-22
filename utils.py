@@ -36,6 +36,9 @@ def ast_to_code(node) -> str:
         return f'{ast_to_code(node.left)} {BINOP_TO_SYMBOL[node.op.__class__]} {ast_to_code(node.right)}'
     if isinstance(node, ast.Num):
         return str(node.n)
+    if isinstance(node, ast.Attribute):
+        # This is a bit random, I had to do it to run test_runner using the runner.
+        return str(node.value) + str(node.attr) + str(node.ctx)
     else:
         raise ValueError('Type not handled yet:', node)
 

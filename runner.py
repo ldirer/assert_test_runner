@@ -122,7 +122,8 @@ class AddIntermediateVariablesTransformer(ast.NodeTransformer):
         # Note since ast_to_code is recursive we will be doing a lot of repeated work here.
         # (We will call it from the root node, then on children... But the call on the root does all the work already!)
         user_friendly_name = ast_to_code(node)
-        # We need a unique id so we use a counter. Fun to see we can use whatever we want (?) in the variable name.
+        # We use a prefix to minimize chances of collision with user-defined variables and a counter to get a unique id.
+        # Fun to see we can use whatever we want in the variable name (spaces, '+'...).
         variable_id = f'{self.prefix}{self.counter}_{user_friendly_name}'
         self.assignments.append(ast.Assign(targets=[ast.Name(id=variable_id, ctx=ast.Store())], value=node))
         self.counter += 1
@@ -193,8 +194,7 @@ def parse_context(variables: typing.Dict) -> typing.List[typing.Tuple]:
             count = transformer_class.get_order(key)
             return transformer_class.get_friendly_name(key), count
         return key, 0
-    # TODO: order this based on counter values (depth in tree?...)
-    # We sort according to count
+    # We sort according to count. This is not great (we'd like a more relevant sort) but it does not hurt either.
     sorted_pairs = sorted([(to_friendly(k), v) for k, v in variables.items()], key=lambda t: t[0][1])
     # We want to discard the count before we print it.
     return [(name, value) for (name, count), value in sorted_pairs]
@@ -202,7 +202,7 @@ def parse_context(variables: typing.Dict) -> typing.List[typing.Tuple]:
 
 def run(mod: ast.Module, filename: str):
     """Compile and run `mod`, report test results to stdout.
-    `filename`: The name of the file containing the tests. Important so we can display the right stacktraces.
+    `filename`: The name of the file containing the tests. Important so we can display the right stack traces.
     """
     # We pass '<ast>' as filename so it's clear where it came from.
     # Actually we will pass the file containing the tests: it's a trick to get traceback to work.
@@ -222,29 +222,6 @@ def main(files: List):
     for fname in files:
         test_module = rewrite_as_test(fname)
         run(test_module, fname)
-
-
-def test_transformer():
-    """Very basic test."""
-    src = 'assert square(add(a, b)) == expected - 1'
-    # We extract the assert node from the ast.Module we get from parsing.
-    assert_node = ast.parse(src).body[0]
-    transformer = AddIntermediateVariablesTransformer()
-    assert_node = transformer.visit(assert_node)
-
-    for descendant in ast.walk(assert_node):
-        # We have replaced function calls and binary ops with variables (ast.Name).
-        assert not isinstance(descendant, ast.Call)
-        assert not isinstance(descendant, ast.BinOp)
-
-    # We expect 3 new intermediary variables
-    assert len(transformer.assignments) == 3
-    var_names = [a.targets[0].id for a in transformer.assignments]
-    names = set(transformer.get_friendly_name(name) for name in var_names)
-    assert names == {'square(add(a, b))', 'add(a, b)', 'expected - 1'}
-
-
-test_transformer()
 
 
 if __name__ == '__main__':
