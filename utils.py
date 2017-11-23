@@ -31,7 +31,10 @@ def ast_to_code(node) -> str:
         return node.id
     if isinstance(node, ast.Call):
         args = ", ".join([ast_to_code(arg) for arg in node.args])
-        return f'{ast_to_code(node.func)}({args})'
+        kwargs = ", ".join([ast_to_code(kw) for kw in node.keywords])
+        return f'{ast_to_code(node.func)}({args}, {kwargs})'
+    if isinstance(node, ast.keyword):
+        return f'{node.arg}={ast_to_code(node.value)}'
     if isinstance(node, ast.BinOp):
         return f'{ast_to_code(node.left)} {BINOP_TO_SYMBOL[node.op.__class__]} {ast_to_code(node.right)}'
     if isinstance(node, ast.Num):
@@ -79,3 +82,11 @@ def print_indent_lines(arg: str, indent=0, **kwargs):
     indented_lines = [' ' * indent + line for line in lines]
     print(*indented_lines, sep='\n', **kwargs)
 
+
+def test_ast_to_code():
+    src = 'f(a.attr, b=1)'
+    node = ast.parse(src).body[0].value
+    assert ast_to_code(node) == src
+
+
+test_ast_to_code()

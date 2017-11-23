@@ -94,17 +94,33 @@ def get_call_test_node(f: ast.FunctionDef) -> ast.Try:
 
 
 class RewriteAssertNodeTransformer(ast.NodeTransformer):
-    """NodeTransformer lets us return a list when the node is part of a collection of statements.
-    This lets us add to the `body` of a module or function definition for instance.
+    """This transformer rewrites each assert node by extracting variables and adding assignment nodes
+    (siblings of the assert node).
 
-    In our case we have:
+    We want to go from:
 
-    FunctionDef -> body: List[statement]
+        assert f(a) == b + 1
 
-    with an ast.Assert somewhere in `body`, and we want to add a node before the ast.Assert in the `body` list.
+    to:
+
+        _intermediate_0 = f(a)
+        _intermediate_1 = b + 1
+        assert _intermediate_0 == _intermediate_1
+
+    This will allow us to display better debugging information (the intermediate values) on test failure.
     """
 
     def visit_Assert(self, node):
+        """
+        NodeTransformer lets us return a list when the node is part of a collection of statements.
+        This lets us add to the `body` of a module or function definition for instance.
+
+        In our case we have:
+
+        FunctionDef -> body: List[statement]
+
+        with an ast.Assert somewhere in `body`, and we want to add a node before the ast.Assert in the `body` list.
+        """
         # This super is not really required, it would be if we had asserts in asserts. But that's unlikely!
         # Though not impossible if we have intermediate functions with asserts in it...
         super().generic_visit(node)
@@ -120,8 +136,8 @@ class RewriteAssertNodeTransformer(ast.NodeTransformer):
 
 
 class AddIntermediateVariablesTransformer(ast.NodeTransformer):
-    """Replaces all Call and BinOp nodes with call to variables and collect their definitions we will (later) insert
-    before the transformed node.
+    """Replaces all Call and BinOp (and more relevant) nodes with call to variables and collect their definitions
+    we will (later) insert before the transformed node.
 
     The transformed node output after .visit will not be 'standalone' as it relies on variable assignments being
     inserted before it in the tree.
@@ -162,6 +178,9 @@ class AddIntermediateVariablesTransformer(ast.NodeTransformer):
         return self.collect_assignments_and_transform(node)
 
     def visit_BinOp(self, node):
+        return self.collect_assignments_and_transform(node)
+
+    def visit_Attribute(self, node):
         return self.collect_assignments_and_transform(node)
 
     @classmethod
@@ -217,12 +236,12 @@ def parse_context(variables: typing.Dict) -> typing.List[typing.Tuple]:
         """:return: (friendly_name, value for ordering)"""
         transformer_class = AddIntermediateVariablesTransformer
         if key.startswith(transformer_class.prefix):
-            # count is a decent proxy for order.
-            # It's like if we're giving all details about the left-hand side, then values for the right hand side.
+            # count is the order in which we traversed the assert tree.
             count = transformer_class.get_order(key)
             return transformer_class.get_friendly_name(key), count
         return key, 0
-    # We sort according to count. This is not great (we'd like a more relevant sort) but it does not hurt either.
+    # We could probably have a more relevant sort (based on depth in the assert tree maybe).
+    # Right now we're giving all details about the left-hand side, then values for the right hand side.
     sorted_pairs = sorted([(to_friendly(k), v) for k, v in variables.items()], key=lambda t: t[0][1])
     # We want to discard the count before we print it.
     return [(name, value) for (name, count), value in sorted_pairs]
@@ -230,6 +249,7 @@ def parse_context(variables: typing.Dict) -> typing.List[typing.Tuple]:
 
 def run(mod: ast.Module, filename: str):
     """Compile and run `mod`, report test results to stdout.
+    `mod`: An ast.Module, expected to be already properly rewritten.
     `filename`: The name of the file containing the tests. Important so we can display the right stack traces.
     """
     # We pass '<ast>' as filename so it's clear where it came from.
