@@ -1,4 +1,4 @@
-#!/home/laurent/miniconda3/envs/genetic/bin/python
+#!/usr/bin/env python
 
 # Grammar here: https://docs.python.org/3/library/ast.html
 # A-mazing practical docs: http://greentreesnakes.readthedocs.io/en/latest/index.html
@@ -41,28 +41,56 @@ def rewrite_as_test(fname: str) -> ast.Module:
 
     for n_already_inserted, (i, f) in enumerate(test_functions):
         f = RewriteAssertNodeTransformer().visit(f)
-        name = ast.Name(id=f.name, ctx=ast.Load())
-        # No args passed to the test functions for now
-        call = ast.Call(name, [], [])
-        # Call node needs to be wrapped. In Expr since we don't use the return value.
-        call_expr = ast.Expr(call)
-
-        # Now we wrap in a try except so we can keep running even if the test fails
-        except_handler = ast.ExceptHandler(type=ast.Name(id='AssertionError', ctx=ast.Load()), name='e',
-                                           body=[
-                                               get_print_node(on_fail_message(f.name)),
-                                               get_log_error_node(f.name, 'e'),
-                                           ])
-
-        wrapped = ast.Try(body=[call_expr], handlers=[except_handler],
-                          orelse=[get_print_node(on_success_message(f.name))], finalbody=[])
+        try_wrapped = get_call_test_node(f)
 
         # We insert it at the top-level of our module (similar to adding lines to the file)
-        mod.body.insert(i + 1 + n_already_inserted, wrapped)
+        mod.body.insert(i + 1 + n_already_inserted, try_wrapped)
 
     # Our module has nodes without lineno and column offset. Tis bad. Breaks compiling. We fill it sort-of-randomly.
     ast.fix_missing_locations(mod)
     return mod
+
+
+def get_call_test_node(f: ast.FunctionDef) -> ast.Try:
+    """
+    If we have this test function:
+    ```
+    def test_example():
+        assert 1 == 0
+    ```
+
+    We want to insert code that looks like:
+
+    ```
+    try:
+        test_example()
+    except AssertionError as e:
+        collect_error_info(e)
+    else:
+        print('great success!')
+    ```
+
+    This function returns the try block (as an ast.Try).
+
+    :param f: A function definition node
+    :return: The relevant try node for the code we want to add.
+    """
+    name = ast.Name(id=f.name, ctx=ast.Load())
+    # No args passed to the test functions for now
+    call = ast.Call(name, [], [])
+    # Call node needs to be wrapped. In Expr since we don't use the return value.
+    call_expr = ast.Expr(call)
+
+    # Now we wrap in a try except so we can keep running even if the test fails
+    except_handler = ast.ExceptHandler(type=ast.Name(id='AssertionError', ctx=ast.Load()), name='e',
+                                       body=[
+                                           get_print_node(on_fail_message(f.name)),
+                                           get_log_error_node(f.name, 'e'),
+                                       ])
+
+    wrapped = ast.Try(body=[call_expr], handlers=[except_handler],
+                      orelse=[get_print_node(on_success_message(f.name))], finalbody=[])
+    return wrapped
 
 
 class RewriteAssertNodeTransformer(ast.NodeTransformer):
@@ -92,11 +120,11 @@ class RewriteAssertNodeTransformer(ast.NodeTransformer):
 
 
 class AddIntermediateVariablesTransformer(ast.NodeTransformer):
-    """Replaces all Call and BinOp nodes with call to variables whose definition we will (later) insert before the
-    transformed node.
+    """Replaces all Call and BinOp nodes with call to variables and collect their definitions we will (later) insert
+    before the transformed node.
 
     The transformed node output after .visit will not be 'standalone' as it relies on variable assignments being
-    previously run.
+    inserted before it in the tree.
     """
 
     # A prefix on all variables we create here so we (hopefully!) dont collide with the user variables.
@@ -158,7 +186,7 @@ def get_log_error_node(test_function_id, value_to_log_id: str) -> ast.Expr:
     """
     # Instead of building the ast manually we parse the line we want.
     # Then we need to 'flatten' it since we want a single Expr and not a Module.
-    # Note the hardcoded _global_errors (which could easily be unhardcoded)
+    # Note the hardcoded '_global_errors' could be 'unhardcoded'
     return ast.parse(f'_global_errors[{test_function_id}] = {value_to_log_id}').body[0]
 
 

@@ -51,3 +51,9 @@ def test_set_comparison():
     a = {1, 2, 3, 4}
     b = {1, 2, 5}
     assert a == b
+
+
+def test_with_attribute():
+    a = lambda: 1
+    a.b = 2
+    assert square(a.b) == 3

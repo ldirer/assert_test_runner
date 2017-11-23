@@ -21,8 +21,8 @@ BINOP_TO_SYMBOL = {
 
 
 def ast_to_code(node) -> str:
-    """A very basic function that does not handle a lot of cases but tries to return a friendly code based on an ast.
-    Specifically we want to rewrite assignments and function calls.
+    """A very basic function that takes an ast node and tries to return a line of python code.
+    It does not handle a lot of cases, specifically we want to rewrite assignments and function calls.
     We dont have to deal with try except, etc.
 
     Though that's still a lot of things!
@@ -38,7 +38,10 @@ def ast_to_code(node) -> str:
         return str(node.n)
     if isinstance(node, ast.Attribute):
         # This is a bit random, I had to do it to run test_runner using the runner.
-        return str(node.value) + str(node.attr) + str(node.ctx)
+        if isinstance(node.ctx, ast.Load):
+            return f'{ast_to_code(node.value)}.{node.attr}'
+        else:
+            raise ValueError('Context not handled in ast.Attribute: ', node.ctx)
     else:
         raise ValueError('Type not handled yet:', node)
 

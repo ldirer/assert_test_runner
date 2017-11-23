@@ -12,7 +12,7 @@ Here's the output of a (failing) test with `assert`:
         assert add(a, b) == result
     AssertionError
 
---> Not the most helpful stacktrace. What is a? What is b? Why did our test fail?  
+This is not the most helpful stacktrace. What is `a`? What is `b`? Why did our test fail?  
 
 It's really hard to figure what has gone wrong without running the test again (and adding print statements/breakpoints).
 
@@ -48,5 +48,5 @@ our variables:
       expected - 1=24
       
       
-You can also try it with your own file(s) containing `test_*` functions at top-level. 
-It will probably break though since I tested it in a limited number of cases ;).
+You can also try it with your own file(s) containing `test_*` functions at top-level.  
+It will probably break though, I only tested it on a small number of cases!
